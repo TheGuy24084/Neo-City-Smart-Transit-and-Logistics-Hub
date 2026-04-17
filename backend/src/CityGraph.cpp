@@ -1,4 +1,5 @@
 #include "CityGraph.h"
+#include <algorithm>
 
 CityGraph::CityGraph() {
     // Constructor logic
@@ -55,4 +56,67 @@ void CityGraph::seedMap() {
     // Extra connections for a more complex graph
     addRoad(5, 8, 110, "Shortcut 01");
     addRoad(9, 2, 250, "Industrial Bypass");
+}
+
+std::vector<int> CityGraph::findShortestPath(int startId, int endId) const {
+    // HUMAN TOUCH: Why Priority Queue?
+    // We use std::priority_queue (Min-Heap) to always extract the node with the minimum 
+    // current distance. This reduces the search complexity from O(V) to O(log V) 
+    // for each extraction, leading to an overall O(E log V) efficiency, 
+    // which is critical for real-time city-scale pathfinding.
+    
+    std::map<int, int> distances;
+    std::map<int, int> previous;
+    
+    // Using a greater comparator to make it a Min-Heap
+    typedef std::pair<int, int> NodeDist; // {distance, nodeId}
+    std::priority_queue<NodeDist, std::vector<NodeDist>, std::greater<NodeDist>> pq;
+
+    for (auto const& [nodeId, _] : adjacencyList) {
+        distances[nodeId] = std::numeric_limits<int>::max();
+    }
+
+    if (distances.find(startId) == distances.end() || distances.find(endId) == distances.end()) {
+        return {}; // Start or end node doesn't exist
+    }
+
+    distances[startId] = 0;
+    pq.push({0, startId});
+
+    while (!pq.empty()) {
+        int d = pq.top().first;
+        int u = pq.top().second;
+        pq.pop();
+
+        if (d > distances[u]) continue;
+        if (u == endId) break; // Optimization: we found the shortest path to target
+
+        if (adjacencyList.count(u)) {
+            for (const auto& edge : adjacencyList.at(u)) {
+                int v = edge.toNode;
+                int weight = edge.weight;
+
+                if (distances[u] + weight < distances[v]) {
+                    distances[v] = distances[u] + weight;
+                    previous[v] = u;
+                    pq.push({distances[v], v});
+                }
+            }
+        }
+    }
+
+    // Reconstruct Path
+    std::vector<int> path;
+    if (distances[endId] == std::numeric_limits<int>::max()) {
+        return {}; // No path found
+    }
+
+    for (int at = endId; at != startId; at = previous[at]) {
+        path.push_back(at);
+        if (previous.find(at) == previous.end()) break; 
+    }
+    path.push_back(startId);
+    
+    std::reverse(path.begin(), path.end());
+    return path;
 }

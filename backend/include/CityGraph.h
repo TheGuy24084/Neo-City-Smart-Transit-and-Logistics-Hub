@@ -5,6 +5,8 @@
 #include <vector>
 #include <map>
 #include <string>
+#include <queue>
+#include <limits>
 
 /**
  * @struct Edge
@@ -36,6 +38,9 @@ public:
     
     // Populates the graph with a small city district (10-15 nodes)
     void seedMap();
+
+    // Dijkstra's Algorithm: returns sequence of node IDs
+    std::vector<int> findShortestPath(int startId, int endId) const;
 
     // Returns the entire graph structure in a format suitable for JSON serialization
     const std::map<int, std::vector<Edge>>& getAdjacencyList() const { return adjacencyList; }

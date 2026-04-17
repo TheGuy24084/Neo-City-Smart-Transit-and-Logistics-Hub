@@ -34,14 +34,37 @@ void handleGetMap(const CityGraph& graph) {
     std::cout << std::endl << "}" << std::endl;
 }
 
+/**
+ * MOCK ANTIGRAVITY API ROUTE: /api/route?start=X&end=Y
+ */
+void handleGetRoute(const CityGraph& graph, int start, int end) {
+    std::cout << "--- Antigravity API: GET /api/route?start=" << start << "&end=" << end << " ---" << std::endl;
+    std::cout << "HTTP/1.1 200 OK" << std::endl;
+    std::cout << "Content-Type: application/json" << std::endl;
+    std::cout << std::endl;
+
+    std::vector<int> path = graph.findShortestPath(start, end);
+    
+    std::cout << "[";
+    for (size_t i = 0; i < path.size(); ++i) {
+        std::cout << path[i] << (i == path.size() - 1 ? "" : ", ");
+    }
+    std::cout << "]" << std::endl;
+}
+
 int main() {
     std::cout << "Neo-City Graph Engine starting..." << std::endl;
     
     CityGraph hub;
     hub.seedMap();
     
-    // Simulate API call
+    // Day 1 Simulation: Fetch Map
     handleGetMap(hub);
+    
+    std::cout << std::endl;
+
+    // Day 2 Simulation: Requesting path from Node 0 to Node 7
+    handleGetRoute(hub, 0, 7);
     
     return 0;
 }
