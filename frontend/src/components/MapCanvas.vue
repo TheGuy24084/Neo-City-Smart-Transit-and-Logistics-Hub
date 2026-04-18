@@ -25,6 +25,56 @@
         </div>
       </div>
     </header>
+    
+    <!-- Time Travel Indicator -->
+    <div 
+        v-if="isTimeTraveling"
+        class="absolute top-24 left-1/2 -translate-x-1/2 z-30 px-6 py-2 bg-amber-500/90 backdrop-blur-md border border-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.4)] flex items-center gap-3 animate-bounce"
+    >
+        <div class="w-3 h-3 rounded-full bg-slate-900 animate-pulse"></div>
+        <span class="text-xs font-black text-slate-900 uppercase tracking-[0.2em]">Time Travel Active // Historical Data</span>
+    </div>
+
+    <!-- Live Traffic Control Panel -->
+    <section class="absolute left-8 top-32 w-80 z-20 flex flex-col gap-4">
+        <div class="bg-slate-900/90 border border-emerald-500/30 p-6 backdrop-blur-xl relative overflow-hidden">
+            <div class="absolute top-0 left-0 w-1 h-full bg-emerald-500 shadow-[0_0_15px_rgba(52,211,153,0.5)]"></div>
+            
+            <h3 class="text-sm font-black text-white uppercase mb-4 tracking-tighter flex items-center gap-2">
+                <span class="text-emerald-400">02.</span> Live Traffic Control
+            </h3>
+
+            <div v-if="activeQueue" class="space-y-4">
+                <div class="flex justify-between items-center bg-slate-800/50 p-3 border border-emerald-500/10">
+                    <span class="text-[10px] text-emerald-500/60 uppercase font-bold">Intersection</span>
+                    <span class="text-lg font-mono text-emerald-400">#{{ activeQueue.intersectionId }}</span>
+                </div>
+
+                <div class="flex flex-col gap-2">
+                    <span class="text-[10px] text-emerald-500/50 uppercase font-bold">Queue Sequence (FIFO)</span>
+                    <div class="flex flex-col gap-2">
+                        <div 
+                            v-for="(car, idx) in activeQueue.cars" 
+                            :key="car.id"
+                            class="p-2 border transition-all duration-300"
+                            :class="idx === 0 ? 'bg-emerald-500/20 border-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.2)]' : 'bg-slate-800/30 border-slate-700'"
+                        >
+                            <div class="flex justify-between items-center text-[10px] font-mono">
+                                <span :class="idx === 0 ? 'text-emerald-300' : 'text-slate-400'">
+                                    {{ idx === 0 ? '[FRONT]' : `[#${idx + 1}]` }}
+                                </span>
+                                <span class="text-white font-bold">{{ car.model }}</span>
+                                <span class="text-slate-500">ID:{{ car.id }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div v-else class="p-4 border border-dashed border-slate-700 text-center">
+                <p class="text-[10px] text-slate-500 uppercase">Select an intersection to monitor traffic</p>
+            </div>
+        </div>
+    </section>
 
     <!-- Navigation Stats Sidebar -->
     <aside 
@@ -147,32 +197,80 @@
             class="text-[10px] font-mono select-none pointer-events-none uppercase font-bold"
             :class="startNodeId === node.intersectionId ? 'fill-emerald-400' : endNodeId === node.intersectionId ? 'fill-red-400' : 'fill-cyan-400'"
           >
-            {{ getNodeLabel(node.intersectionId) }}
           </text>
+        </g>
+
+        <!-- Dynamic Car Rendering (Day 3 Feature) -->
+        <g v-for="(pos, carId) in liveCars" :key="`car-${carId}`">
+            <circle
+                :cx="pos.x"
+                :cy="pos.y"
+                r="4"
+                class="fill-white stroke-cyan-400 stroke-2 transition-all duration-700 ease-in-out"
+                filter="url(#neon-glow)"
+            />
+            <path 
+                :d="`M ${pos.x - 6} ${pos.y - 6} L ${pos.x + 6} ${pos.y + 6} M ${pos.x + 6} ${pos.y - 6} L ${pos.x - 6} ${pos.y + 6}`"
+                class="stroke-cyan-500/40"
+                stroke-width="1"
+            />
         </g>
       </svg>
 
-      <!-- Legend Overlay -->
-      <div class="absolute bottom-8 left-8 p-4 bg-slate-900/90 border-l-2 border-cyan-500 backdrop-blur-sm">
+    <!-- Legend Overlay -->
+    <div class="absolute bottom-12 left-12 p-4 bg-slate-900/90 border-l-2 border-cyan-500 backdrop-blur-sm z-20">
         <h3 class="text-xs font-bold text-slate-400 uppercase mb-2 tracking-widest">Topology Monitor</h3>
         <div class="flex flex-col gap-1">
-          <div class="flex justify-between items-center gap-8">
-            <span class="text-[10px] text-slate-500 font-mono uppercase">Intersections</span>
-            <span class="text-[10px] text-cyan-400 font-mono tracking-tighter">{{ nodes.length }}</span>
-          </div>
-          <div class="flex justify-between items-center gap-8">
-            <span class="text-[10px] text-slate-500 font-mono uppercase">Structural Edges</span>
-            <span class="text-[10px] text-cyan-400 font-mono tracking-tighter">{{ totalEdges }}</span>
-          </div>
+            <div class="flex justify-between items-center gap-8">
+                <span class="text-[10px] text-slate-500 font-mono uppercase">Intersections</span>
+                <span class="text-[10px] text-cyan-400 font-mono tracking-tighter">{{ nodes.length }}</span>
+            </div>
+            <div class="flex justify-between items-center gap-8">
+                <span class="text-[10px] text-slate-500 font-mono uppercase">Structural Edges</span>
+                <span class="text-[10px] text-cyan-400 font-mono tracking-tighter">{{ totalEdges }}</span>
+            </div>
         </div>
-      </div>
     </div>
+    </div>
+
+    <!-- Timeline Scrubber (Day 3 Feature) -->
+    <footer class="absolute bottom-0 w-full p-8 z-30 bg-gradient-to-t from-slate-950 to-transparent">
+        <div class="max-w-4xl mx-auto space-y-4">
+            <div class="flex justify-between items-end px-2">
+                <div class="flex flex-col">
+                    <span class="text-[10px] text-cyan-500/50 uppercase font-bold tracking-widest">Chronos Engine</span>
+                    <span class="text-xl font-mono text-white italic">
+                        {{ isTimeTraveling ? 'HISTORICAL_RESTORE' : 'REAL_TIME_STREAM' }}
+                    </span>
+                </div>
+                <div class="text-right">
+                    <span class="text-[10px] text-slate-500 font-mono">STEP: {{ currentSnapshotIndex }}/{{ (historySnapshots.length || 1) - 1 }}</span>
+                    <p class="text-xs font-mono text-cyan-400">{{ currentSnapshotTimestamp }}</p>
+                </div>
+            </div>
+            
+            <div class="relative group">
+                <input 
+                    type="range" 
+                    min="0" 
+                    :max="(historySnapshots.length || 1) - 1" 
+                    v-model="currentSnapshotIndex"
+                    class="w-full h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-cyan-500 hover:accent-cyan-400 transition-all"
+                >
+                <div 
+                    class="absolute -top-1 h-3 bg-cyan-500/20 pointer-events-none transition-all duration-300"
+                    :style="{ width: `${(currentSnapshotIndex / ((historySnapshots.length || 1) - 1)) * 100}%` }"
+                ></div>
+            </div>
+        </div>
+    </footer>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed } from 'vue';
+import { ref, onMounted, onUnmounted, computed, watch } from 'vue';
 import type { CityMap, Node, Edge } from '../types/map';
+import type { Car, StateSnapshot, QueueStatus } from '../types/traffic';
 
 const cityMap = ref<CityMap>({});
 const nodes = ref<Node[]>([]);
@@ -182,6 +280,19 @@ const hoverNode = ref<number | null>(null);
 const startNodeId = ref<number | null>(null);
 const endNodeId = ref<number | null>(null);
 const shortestPath = ref<number[]>([]);
+
+// Traffic & History State (Day 3)
+const activeQueue = ref<QueueStatus | null>(null);
+const historySnapshots = ref<StateSnapshot[]>([]);
+const currentSnapshotIndex = ref(0);
+const isTimeTraveling = computed(() => currentSnapshotIndex.value < historySnapshots.value.length - 1);
+
+const liveCars = ref<Record<number, { x: number, y: number, id: number }>>({});
+const currentSnapshotTimestamp = computed(() => {
+    if (!historySnapshots.value.length) return "N/A";
+    const date = new Date(historySnapshots.value[currentSnapshotIndex.value].timestamp);
+    return date.toLocaleString('en-US', { hour12: false });
+});
 
 const width = ref(window.innerWidth);
 const height = ref(window.innerHeight);
@@ -233,6 +344,9 @@ const getNodeLabel = (id: number) => {
 };
 
 const handleNodeClick = (id: number) => {
+    // Select intersection for traffic monitoring
+    fetchTrafficStatus(id);
+
     if (startNodeId.value === null) {
         startNodeId.value = id;
     } else if (endNodeId.value === null && startNodeId.value !== id) {
@@ -243,6 +357,59 @@ const handleNodeClick = (id: number) => {
         startNodeId.value = id;
     }
 };
+
+const fetchTrafficStatus = async (id: number) => {
+    try {
+        console.log(`Fetching traffic status for intersection: ${id}`);
+        // Mock data for the demo
+        activeQueue.value = {
+            intersectionId: id,
+            queueLength: 3,
+            cars: [
+                { id: 101, currentIntersection: 0, targetIntersection: id, progress: 0.9, model: "CyberSedan" },
+                { id: 102, currentIntersection: 0, targetIntersection: id, progress: 0.7, model: "NeonTruck" },
+                { id: 103, currentIntersection: 0, targetIntersection: id, progress: 0.5, model: "VoltRider" }
+            ]
+        };
+    } catch (error) {
+        console.error("Traffic fetch error:", error);
+    }
+};
+
+// Simulation Loop for History
+const initHistory = () => {
+    const snapshots: StateSnapshot[] = [];
+    const baseTime = Date.now() - 100000;
+    
+    for (let i = 0; i < 50; i++) {
+        const positions: Record<number, { x: number, y: number }> = {};
+        // Randomly place cars for history demo
+        [101, 102, 103].forEach(carId => {
+            const node = nodes.value[Math.floor(Math.random() * nodes.value.length)];
+            if (node) {
+                positions[carId] = { 
+                    x: node.x + (Math.random() - 0.5) * 40, 
+                    y: node.y + (Math.random() - 0.5) * 40 
+                };
+            }
+        });
+
+        snapshots.push({
+            timestamp: baseTime + i * 2000,
+            carPositions: positions,
+            trafficLights: {},
+            carCount: 3
+        });
+    }
+    historySnapshots.value = snapshots;
+    currentSnapshotIndex.value = snapshots.length - 1;
+};
+
+watch(currentSnapshotIndex, (newIdx) => {
+    if (historySnapshots.value[newIdx]) {
+        liveCars.value = historySnapshots.value[newIdx].carPositions;
+    }
+});
 
 const clearRoute = () => {
     startNodeId.value = null;
@@ -351,6 +518,9 @@ const fetchMapData = async () => {
     
     cityMap.value = response;
     nodes.value = generateLayout(response);
+    
+    // Initialize history after nodes are generated
+    setTimeout(initHistory, 500);
   } catch (error) {
     console.error("Failed to load Neo-City Map:", error);
   }
