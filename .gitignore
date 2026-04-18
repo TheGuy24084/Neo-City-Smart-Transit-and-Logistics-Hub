@@ -1,0 +1,25 @@
+# Binaries
+*.exe
+*.o
+*.obj
+backend/app.exe
+backend/test_build.exe
+
+# Dependencies
+node_modules/
+frontend/node_modules/
+
+# Build outputs
+dist/
+frontend/dist/
+build/
+out/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log

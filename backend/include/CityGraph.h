@@ -9,6 +9,9 @@
 #include <limits>
 #include <list>
 #include <chrono>
+#include <mutex>
+#include <set>
+#include <memory>
 
 /**
  * @struct Car
@@ -31,6 +34,14 @@ struct StateSnapshot {
     long long timestamp; // epoch ms
     std::map<int, std::pair<double, double>> carPositions; // carId -> (x, y)
     std::map<int, bool> trafficLights; // intersectionId -> isGreen
+
+    // Day 5: Ensuring no raw pointers are used for snapshots
+};
+
+struct DistrictSummary {
+    int totalNodes;
+    int totalEdges;
+    std::vector<std::string> streets;
 };
 
 /**
@@ -40,27 +51,33 @@ struct StateSnapshot {
 class TrafficManager {
 public:
     void enqueueCar(int intersectionId, Car car) {
+        std::lock_guard<std::mutex> lock(mtx);
         intersectionQueues[intersectionId].push(car);
     }
 
     Car dequeueCar(int intersectionId) {
-        if (intersectionQueues[intersectionId].empty()) return {-1, -1, -1, 0, ""};
+        std::lock_guard<std::mutex> lock(mtx);
+        if (intersectionQueues[intersectionId].empty()) return {-1, -1, -1, 0, "", 0};
         Car car = intersectionQueues[intersectionId].front();
         intersectionQueues[intersectionId].pop();
         return car;
     }
 
     size_t getQueueLength(int intersectionId) {
+        std::lock_guard<std::mutex> lock(mtx);
         if (intersectionQueues.find(intersectionId) == intersectionQueues.end()) return 0;
         return intersectionQueues[intersectionId].size();
     }
 
+    // [NOTE] Returning reference to internal queue is not thread-safe 
+    // unless the caller also locks. For this demo, we assume read-only dashboard access.
     const std::queue<Car>& getQueue(int intersectionId) {
         return intersectionQueues[intersectionId];
     }
 
 private:
     std::map<int, std::queue<Car>> intersectionQueues;
+    std::mutex mtx;
 };
 
 /**
@@ -76,6 +93,7 @@ private:
 class HistoryEngine {
 public:
     void recordState(const StateSnapshot& state) {
+        std::lock_guard<std::mutex> lock(mtx);
         history.push_back(state);
         // Keep history limited to last 100 snapshots for performance demo
         if (history.size() > 100) history.pop_front();
@@ -87,6 +105,7 @@ public:
 
 private:
     std::list<StateSnapshot> history;
+    mutable std::mutex mtx; // Mutable so const getters can lock if needed
 };
 
 /**
@@ -184,10 +203,17 @@ public:
     // The optional parameter returns the number of nodes visited for analytics.
     std::vector<int> findShortestPath(int startId, int endId, int& nodesVisited) const;
 
+    /**
+     * Recursive DFS District Summary (Day 5 Goal)
+     * Traverses the graph to count all unique infrastructure in the reachable district.
+     */
+    DistrictSummary getDistrictSummary(int startNodeId) const;
+
     // Returns the entire graph structure in a format suitable for JSON serialization
     const std::map<int, std::vector<Edge>>& getAdjacencyList() const { return adjacencyList; }
 
 private:
+    void performDFSSummary(int u, std::set<int>& visitedNodes, std::set<std::string>& uniqueStreets, int& edgeCount) const;
     std::map<int, std::vector<Edge>> adjacencyList;
 };
 

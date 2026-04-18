@@ -8,6 +8,7 @@ export interface Node {
     intersectionId: number;
     x: number; // For visualization
     y: number; // For visualization
+    name?: string;
 }
 
 export interface CityMap {
