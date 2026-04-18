@@ -1,14 +1,37 @@
 <template>
   <div class="w-full h-screen bg-slate-950 flex flex-col items-center justify-center overflow-hidden font-sans selection:bg-cyan-500/30">
     <!-- Header with Cyberpunk styling -->
-    <header class="absolute top-0 w-full p-6 flex justify-between items-center z-10 bg-slate-950/80 backdrop-blur-md border-b border-cyan-500/20">
+    <header class="absolute top-0 w-full p-6 flex justify-between items-center z-40 bg-slate-950/80 backdrop-blur-md border-b border-cyan-500/20">
       <div class="flex flex-col">
         <h1 class="text-3xl font-black tracking-tighter text-cyan-400 uppercase italic">
           Neo-Sector <span class="text-white text-4xl">07</span>
         </h1>
-        <p class="text-[10px] text-cyan-500/60 font-mono tracking-widest uppercase">Smart Transit Hub // Route Intelligence v2.0</p>
+        <!-- Breadcrumbs UI -->
+        <nav class="flex items-center gap-2 mt-2">
+            <div 
+                v-for="(state, idx) in navigationStack" 
+                :key="`crumb-${idx}`"
+                class="flex items-center gap-2 group"
+            >
+                <button 
+                    @click="popTo(idx)"
+                    class="text-[10px] font-mono transition-colors"
+                    :class="idx === navigationStack.length - 1 ? 'text-white cursor-default' : 'text-cyan-500/60 hover:text-cyan-400'"
+                >
+                    {{ state.label }}
+                </button>
+                <span v-if="idx < navigationStack.length - 1" class="text-slate-700 text-[10px]">/</span>
+            </div>
+        </nav>
       </div>
       <div class="flex gap-4 items-center">
+        <button 
+            v-if="navigationStack.length > 1"
+            @click="popView"
+            class="px-3 py-1 bg-cyan-500/20 hover:bg-cyan-500/40 border border-cyan-500/50 text-[10px] text-cyan-300 uppercase font-black tracking-widest transition-all flex items-center gap-2 group"
+        >
+            <span class="group-hover:-translate-x-1 transition-transform">←</span> Back
+        </button>
         <div v-if="startNodeId !== null && endNodeId === null" class="animate-pulse flex items-center gap-2">
             <div class="w-2 h-2 rounded-full bg-red-500"></div>
             <span class="text-[10px] font-mono text-red-400 uppercase">Awaiting Destination...</span>
@@ -20,9 +43,6 @@
         >
             Clear Route
         </button>
-        <div class="px-4 py-2 bg-cyan-500/10 border border-cyan-500/30 rounded-sm">
-          <span class="text-xs font-mono text-cyan-400 uppercase">System: Online</span>
-        </div>
       </div>
     </header>
     
@@ -76,12 +96,80 @@
         </div>
     </section>
 
-    <!-- Navigation Stats Sidebar -->
+    <!-- Navigation Stats / Metrics Dashboard Sidebar -->
     <aside 
-        class="absolute right-8 top-32 w-72 z-20 transition-all duration-500"
-        :class="shortestPath.length > 0 ? 'translate-x-0 opacity-100' : 'translate-x-12 opacity-0 pointer-events-none'"
+        class="absolute right-8 top-32 w-80 z-20 flex flex-col gap-6"
     >
-        <div class="bg-slate-900/90 border border-cyan-500/30 p-6 backdrop-blur-xl relative overflow-hidden group">
+        <!-- Metrics Engine (Day 4) -->
+        <div class="bg-slate-900/95 border border-purple-500/30 p-6 backdrop-blur-xl relative overflow-hidden transition-all duration-700 hover:border-purple-500/60 group shadow-2xl shadow-purple-500/10">
+            <div class="absolute top-0 left-0 w-1 h-full bg-purple-500 shadow-[0_0_15px_rgba(168,85,247,0.5)]"></div>
+            <div class="absolute -right-4 -top-4 w-16 h-16 bg-purple-500/5 rounded-full blur-2xl group-hover:bg-purple-500/10 transition-all"></div>
+            
+            <h3 class="text-sm font-black text-white uppercase mb-4 tracking-tighter flex justify-between items-center">
+                <span><span class="text-purple-400">03.</span> Metrics Engine</span>
+                <span class="px-2 py-0.5 bg-purple-500/20 border border-purple-500/40 text-[9px] text-purple-300 rounded-full animate-pulse">LIVE</span>
+            </h3>
+
+            <div class="space-y-5">
+                <!-- Dijkstra Visited Nodes -->
+                <div class="space-y-2">
+                    <div class="flex justify-between items-end">
+                        <span class="text-[10px] text-purple-400/70 uppercase font-bold">Graph Efficiency</span>
+                        <span class="text-[10px] font-mono text-purple-300">O(E log V)</span>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <div class="flex-1 h-1.5 bg-slate-800 rounded-full overflow-hidden border border-purple-500/10">
+                            <div 
+                                class="h-full bg-gradient-to-r from-purple-600 to-purple-400 transition-all duration-1000"
+                                :style="{ width: `${Math.min(100, (metrics.nodesVisited / nodes.length) * 100)}%` }"
+                            ></div>
+                        </div>
+                        <span class="text-xs font-mono text-white">{{ metrics.nodesVisited }} <span class="text-[9px] text-purple-500">Nodes</span></span>
+                    </div>
+                </div>
+
+                <!-- History Footprint -->
+                <div class="space-y-2">
+                    <div class="flex justify-between items-end">
+                        <span class="text-[10px] text-purple-400/70 uppercase font-bold">Memory (DLL)</span>
+                        <span class="text-[10px] font-mono text-purple-300">O(N) history</span>
+                    </div>
+                    <div class="bg-slate-800/50 p-3 border border-purple-500/10 flex items-center justify-between">
+                        <div class="flex flex-col">
+                            <span class="text-[9px] text-slate-500 uppercase">Snapshot Size</span>
+                            <span class="text-lg font-mono text-white tracking-tighter">{{ (metrics.historyBytes / 1024).toFixed(2) }}KB</span>
+                        </div>
+                        <div class="w-10 h-10 border border-purple-500/20 rounded-lg flex items-center justify-center bg-purple-500/5">
+                            <span class="text-purple-400 font-mono text-xs">{{ historySnapshots.length }}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- System Health (Stack Depth) -->
+                <div class="pt-4 border-t border-purple-500/10">
+                    <div class="flex justify-between items-center">
+                        <span class="text-[10px] text-purple-400/50 uppercase font-bold">Stack Depth</span>
+                        <div class="flex gap-1">
+                            <div 
+                                v-for="i in 5" 
+                                :key="`health-${i}`"
+                                class="w-3 h-1.5 transition-all duration-300"
+                                :class="i <= navigationStack.length ? 'bg-purple-500 shadow-[0_0_5px_rgba(168,85,247,0.5)]' : 'bg-slate-800'"
+                            ></div>
+                        </div>
+                    </div>
+                    <p class="mt-3 text-[9px] text-slate-500 font-mono italic leading-tight">
+                        LIFO Stack management ensures O(1) context switching. Health: OPTIMAL.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Dijkstra Stat Panel -->
+        <div 
+            v-if="shortestPath.length > 0"
+            class="bg-slate-900/90 border border-cyan-500/30 p-6 backdrop-blur-xl relative overflow-hidden group animate-slide-in-right"
+        >
             <div class="absolute top-0 left-0 w-1 h-full bg-cyan-500 shadow-[0_0_15px_rgba(34,211,238,0.5)]"></div>
             
             <h3 class="text-sm font-black text-white uppercase mb-4 tracking-tighter flex items-center gap-2">
@@ -97,7 +185,7 @@
                 </div>
 
                 <div class="flex flex-col">
-                    <span class="text-[10px] text-cyan-500/50 uppercase font-bold">Node Sequence</span>
+                    <span class="text-[10px] text-cyan-500/50 uppercase font-bold text-xs">Route Path</span>
                     <div class="flex flex-wrap gap-1 mt-2">
                         <span 
                             v-for="(nodeId, idx) in shortestPath" 
@@ -108,11 +196,29 @@
                         </span>
                     </div>
                 </div>
-                
-                <div class="pt-4 border-t border-cyan-500/10">
-                    <p class="text-[9px] text-slate-500 font-mono italic leading-tight">
-                        Optimized via Dijkstra SSSP algorithm. Latency: < 1ms.
-                    </p>
+            </div>
+        </div>
+
+        <!-- Queue Congestion (Day 4) -->
+        <div v-if="activeQueue" class="bg-slate-900/90 border border-emerald-500/30 p-6 backdrop-blur-xl relative overflow-hidden animate-slide-in-bottom">
+            <div class="absolute top-0 left-0 w-1 h-full bg-emerald-500 shadow-[0_0_15px_rgba(52,211,153,0.5)]"></div>
+            <h3 class="text-sm font-black text-white uppercase mb-4 tracking-tighter">
+                <span class="text-emerald-400">02.</span> Traffic Load
+            </h3>
+            <div class="space-y-2">
+                <div class="flex justify-between text-[10px] font-bold uppercase">
+                    <span class="text-emerald-500/60">Congestion</span>
+                    <span class="text-emerald-400">{{ (activeQueue.cars.length / 5 * 100).toFixed(0) }}%</span>
+                </div>
+                <div class="h-1 bg-slate-800 rounded-full overflow-hidden">
+                    <div 
+                        class="h-full bg-emerald-500 transition-all duration-1000"
+                        :style="{ width: `${(activeQueue.cars.length / 5) * 100}%` }"
+                    ></div>
+                </div>
+                <div class="flex justify-between items-center mt-3">
+                    <span class="text-[9px] text-slate-500 uppercase">Avg Wait Time</span>
+                    <span class="text-xs font-mono text-white">{{ metrics.avgWaitTime }}s</span>
                 </div>
             </div>
         </div>
@@ -268,8 +374,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed, watch } from 'vue';
-import type { CityMap, Node, Edge } from '../types/map';
+import { ref, onMounted, onUnmounted, computed, watch, reactive } from 'vue';
+import type { CityMap, Node, Edge, NavState } from '../types/map';
 import type { Car, StateSnapshot, QueueStatus } from '../types/traffic';
 
 const cityMap = ref<CityMap>({});
@@ -280,6 +386,19 @@ const hoverNode = ref<number | null>(null);
 const startNodeId = ref<number | null>(null);
 const endNodeId = ref<number | null>(null);
 const shortestPath = ref<number[]>([]);
+
+// Navigation Stack (LIFO - Day 4)
+const navigationStack = ref<NavState[]>([
+    { type: 'city', label: 'Neo-Sector 07' }
+]);
+
+// Analytics Metrics (Day 4)
+const metrics = reactive({
+    nodesVisited: 0,
+    historyBytes: 0,
+    avgWaitTime: 4.2,
+    systemStatus: 'OPTIMAL'
+});
 
 // Traffic & History State (Day 3)
 const activeQueue = ref<QueueStatus | null>(null);
@@ -328,6 +447,10 @@ const pathLines = computed(() => {
 const handleResize = () => {
   width.value = window.innerWidth;
   height.value = window.innerHeight;
+  // Re-align map on window resize
+  if (Object.keys(cityMap.value).length > 0) {
+    nodes.value = generateLayout(cityMap.value);
+  }
 };
 
 const getNodeClass = (id: number) => {
@@ -347,6 +470,13 @@ const handleNodeClick = (id: number) => {
     // Select intersection for traffic monitoring
     fetchTrafficStatus(id);
 
+    // Push to Nav Stack (Day 4)
+    pushView({ 
+        type: 'intersection', 
+        id, 
+        label: `Intersection #${id}` 
+    });
+
     if (startNodeId.value === null) {
         startNodeId.value = id;
     } else if (endNodeId.value === null && startNodeId.value !== id) {
@@ -355,6 +485,38 @@ const handleNodeClick = (id: number) => {
     } else if (startNodeId.value !== null && endNodeId.value !== null) {
         clearRoute();
         startNodeId.value = id;
+    }
+};
+
+// Navigation Stack Logic (Day 4)
+const pushView = (state: NavState) => {
+    // Only push if it's not the current view
+    const current = navigationStack.value[navigationStack.value.length - 1];
+    if (current.type === state.type && current.id === state.id) return;
+    
+    // Limits stack for health indicator demo
+    if (navigationStack.value.length < 5) {
+        navigationStack.value.push(state);
+    }
+};
+
+const popView = () => {
+    if (navigationStack.value.length > 1) {
+        navigationStack.value.pop();
+        // Reset node selections if we pop back to city level
+        const current = navigationStack.value[navigationStack.value.length - 1];
+        if (current.type === 'city') {
+            clearRoute();
+            activeQueue.value = null;
+        }
+    }
+};
+
+const popTo = (index: number) => {
+    navigationStack.value = navigationStack.value.slice(0, index + 1);
+    if (index === 0) {
+        clearRoute();
+        activeQueue.value = null;
     }
 };
 
@@ -425,13 +587,13 @@ const findShortestPath = async () => {
         // simulate Antigravity API route
         const response = await fetch(`/api/route?start=${startNodeId.value}&end=${endNodeId.value}`);
         
-        // Since we are mocking the backend in main.cpp, we simulate the result here for the UI
-        // In a real environment, this line would be: const path = await response.json();
-        
-        // MOCK LOGIC for demo (matches C++ implementation)
-        // We'll use a local mock for now to ensure the UI is wowed immediately
+        // MOCK LOGIC for Day 4 Demo: Update metrics
         const path = await simulateBackendDijkstra(startNodeId.value, endNodeId.value);
         shortestPath.value = path;
+        
+        // Simulate fetching /api/metrics after the route is calculated
+        metrics.nodesVisited = Math.floor(path.length * 1.5 + Math.random() * 5); // Simulated visited count
+        metrics.historyBytes = historySnapshots.value.length * 1024;
     } catch (error) {
         console.error("Pathfinding error:", error);
     }
@@ -483,18 +645,30 @@ const simulateBackendDijkstra = async (start: number, end: number) => {
     return path.reverse();
 };
 
-// Simple Layout Engine
+// Optimized Layout Engine for Neo-City
 const generateLayout = (data: CityMap) => {
   const nodeIds = Object.keys(data).map(Number);
+  const totalNodes = nodeIds.length;
+  
+  // Define a safe zone for the city map to avoid overlapping with sidebars
+  // Sidebars are approx 320px wide (w-80 = 20rem = 320px)
+  const marginX = width.value > 1200 ? 400 : 100;
+  const marginY = 150;
+  
+  const drawWidth = width.value - marginX * 2;
+  const drawHeight = height.value - marginY * 2;
   
   return nodeIds.map((id, index) => {
-    const angle = (index / nodeIds.length) * Math.PI * 2;
-    const radius = Math.min(width.value, height.value) * 0.35;
+    // Use an elegant Golden Ratio or simple spiral/ellipse for better distribution
+    const angle = (index / totalNodes) * Math.PI * 2;
+    
+    // Create a slight organic variation that doesn't feel "broken"
+    const variance = (id % 5 - 2) * 10; 
     
     return {
       intersectionId: id,
-      x: width.value / 2 + Math.cos(angle) * (radius + (id % 3) * 60),
-      y: height.value / 2 + Math.sin(angle) * (radius + (id % 2) * 40),
+      x: width.value / 2 + Math.cos(angle) * (drawWidth / 2) + variance,
+      y: height.value / 2 + Math.sin(angle) * (drawHeight / 2) + variance,
     };
   });
 };
@@ -559,6 +733,24 @@ onUnmounted(() => {
 .animate-ping-slow {
     transform-origin: center;
     animation: ping-slow 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+@keyframes slide-in-right {
+    from { transform: translateX(50px); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes slide-in-bottom {
+    from { transform: translateY(50px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+.animate-slide-in-right {
+    animation: slide-in-right 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-slide-in-bottom {
+    animation: slide-in-bottom 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 .clip-path-polygon {

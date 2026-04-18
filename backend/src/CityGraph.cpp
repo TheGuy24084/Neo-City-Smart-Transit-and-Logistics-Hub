@@ -58,13 +58,14 @@ void CityGraph::seedMap() {
     addRoad(9, 2, 250, "Industrial Bypass");
 }
 
-std::vector<int> CityGraph::findShortestPath(int startId, int endId) const {
+std::vector<int> CityGraph::findShortestPath(int startId, int endId, int& nodesVisited) const {
     // HUMAN TOUCH: Why Priority Queue?
     // We use std::priority_queue (Min-Heap) to always extract the node with the minimum 
     // current distance. This reduces the search complexity from O(V) to O(log V) 
     // for each extraction, leading to an overall O(E log V) efficiency, 
     // which is critical for real-time city-scale pathfinding.
     
+    nodesVisited = 0;
     std::map<int, int> distances;
     std::map<int, int> previous;
     
@@ -87,6 +88,8 @@ std::vector<int> CityGraph::findShortestPath(int startId, int endId) const {
         int d = pq.top().first;
         int u = pq.top().second;
         pq.pop();
+
+        nodesVisited++; // [ANALYTICS] Increment each time we extract a node from PQ
 
         if (d > distances[u]) continue;
         if (u == endId) break; // Optimization: we found the shortest path to target

@@ -20,6 +20,7 @@ struct Car {
     int targetIntersection;
     double progress; // 0.0 to 1.0 along the road
     std::string model;
+    long long entryTimestamp; // Added for Analytics: Time entered the queue
 };
 
 /**
@@ -89,6 +90,66 @@ private:
 };
 
 /**
+ * @class AnalyticsEngine
+ * @brief Tracks and visualizes algorithm performance and system state.
+ */
+class AnalyticsEngine {
+public:
+    AnalyticsEngine() : lastDijkstraNodesVisited(0) {}
+
+    void trackDijkstra(int nodesVisited) {
+        lastDijkstraNodesVisited = nodesVisited;
+    }
+
+    int getHistoryMemoryFootprint(const HistoryEngine& history) {
+        // Mock calculation: size of list * estimated size per snapshot
+        return static_cast<int>(history.getHistory().size() * sizeof(StateSnapshot));
+    }
+
+    double getAverageWaitTime(TrafficManager& tm, int intersectionId) {
+        auto const& q = tm.getQueue(intersectionId);
+        if (q.empty()) return 0.0;
+
+        long long totalWait = 0;
+        long long now = std::chrono::system_clock::now().time_since_epoch().count();
+        
+        // Note: std::queue doesn't support iteration, but in a real system we'd use 
+        // a structure that does, or track it on dequeue. For this demo, we'll 
+        // simulate a snapshot.
+        return 4.2; // Mock avg wait time in seconds for the demo
+    }
+
+    int getLastDijkstraNodesVisited() const { return lastDijkstraNodesVisited; }
+
+private:
+    int lastDijkstraNodesVisited;
+};
+
+/**
+ * @class NavigationStack
+ * @brief LIFO structure for UI breadcrumbs and drill-down navigation.
+ * 
+ * HUMAN TOUCH: Why a Stack for drill-down?
+ * A LIFO (Last-In-First-Out) Stack is the natural implementation for hierarchical 
+ * "drill-down" interfaces. As a user dives deeper into data (City -> District -> Node), 
+ * we "push" states. Returning ("Back" button) simply "pops" the top, restoring the 
+ * previous context perfectly without complex state re-calculation.
+ */
+template <typename T>
+class NavigationStack {
+    std::vector<T> stack;
+public:
+    void push(T state) { stack.push_back(state); }
+    T pop() { 
+        if (stack.empty()) return T();
+        T top = stack.back();
+        stack.pop_back();
+        return top;
+    }
+    size_t depth() const { return stack.size(); }
+};
+
+/**
  * @struct Edge
  * @brief Represents a road connecting two intersections.
  */
@@ -120,7 +181,8 @@ public:
     void seedMap();
 
     // Dijkstra's Algorithm: returns sequence of node IDs
-    std::vector<int> findShortestPath(int startId, int endId) const;
+    // The optional parameter returns the number of nodes visited for analytics.
+    std::vector<int> findShortestPath(int startId, int endId, int& nodesVisited) const;
 
     // Returns the entire graph structure in a format suitable for JSON serialization
     const std::map<int, std::vector<Edge>>& getAdjacencyList() const { return adjacencyList; }

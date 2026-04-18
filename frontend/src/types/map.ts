@@ -13,3 +13,9 @@ export interface Node {
 export interface CityMap {
     [key: number]: Edge[];
 }
+
+export interface NavState {
+    type: 'city' | 'intersection' | 'district';
+    id?: number;
+    label: string;
+}
