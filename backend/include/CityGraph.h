@@ -13,6 +13,8 @@
 #include <set>
 #include <memory>
 
+class CityGraph;
+
 /**
  * @struct Car
  * @brief Represents a vehicle in the simulation.
@@ -108,6 +110,57 @@ private:
     mutable std::mutex mtx; // Mutable so const getters can lock if needed
 };
 
+
+
+/**
+ * @struct Edge
+ * @brief Represents a road connecting two intersections.
+ */
+struct Edge {
+    int toNode;         // The ID of the target intersection.
+    int weight;         // Distance or cost (e.g., meters).
+    std::string streetName;
+};
+
+/**
+ * @class CityGraph
+ * @brief Neo-City Graph Engine handles the transit network structure.
+ * 
+ * HUMAN TOUCH: Why an Adjacency List?
+ * We use a std::map<int, std::vector<Edge>> for our city map because urban networks are
+ * inherently sparse. An Adjacency Matrix would waste O(V^2) space on non-existent roads.
+ * The list format ensures we only store data for actual connections, making it more
+ * space-efficient and faster to iterate over neighboring intersections.
+ */
+class CityGraph {
+public:
+    CityGraph();
+    ~CityGraph();
+
+    void addIntersection(int intersectionId);
+    void addRoad(int fromNode, int toNode, int weight, const std::string& streetName);
+    
+    // Populates the graph with a small city district (10-15 nodes)
+    void seedMap();
+
+    // Dijkstra's Algorithm: returns sequence of node IDs
+    // The optional parameter returns the number of nodes visited for analytics.
+    std::vector<int> findShortestPath(int startId, int endId, int& nodesVisited) const;
+
+    /**
+     * Recursive DFS District Summary (Day 5 Goal)
+     * Traverses the graph to count all unique infrastructure in the reachable district.
+     */
+    DistrictSummary getDistrictSummary(int startNodeId) const;
+
+    // Returns the entire graph structure in a format suitable for JSON serialization
+    const std::map<int, std::vector<Edge>>& getAdjacencyList() const { return adjacencyList; }
+
+private:
+    void performDFSSummary(int u, std::set<int>& visitedNodes, std::set<std::string>& uniqueStreets, int& edgeCount) const;
+    std::map<int, std::vector<Edge>> adjacencyList;
+};
+
 /**
  * @class AnalyticsEngine
  * @brief Tracks and visualizes algorithm performance and system state.
@@ -160,12 +213,6 @@ private:
 /**
  * @class NavigationStack
  * @brief LIFO structure for UI breadcrumbs and drill-down navigation.
- * 
- * HUMAN TOUCH: Why a Stack for drill-down?
- * A LIFO (Last-In-First-Out) Stack is the natural implementation for hierarchical 
- * "drill-down" interfaces. As a user dives deeper into data (City -> District -> Node), 
- * we "push" states. Returning ("Back" button) simply "pops" the top, restoring the 
- * previous context perfectly without complex state re-calculation.
  */
 template <typename T>
 class NavigationStack {
@@ -179,55 +226,6 @@ public:
         return top;
     }
     size_t depth() const { return stack.size(); }
-};
-
-/**
- * @struct Edge
- * @brief Represents a road connecting two intersections.
- */
-struct Edge {
-    int toNode;         // The ID of the target intersection.
-    int weight;         // Distance or cost (e.g., meters).
-    std::string streetName;
-};
-
-/**
- * @class CityGraph
- * @brief Neo-City Graph Engine handles the transit network structure.
- * 
- * HUMAN TOUCH: Why an Adjacency List?
- * We use a std::map<int, std::vector<Edge>> for our city map because urban networks are
- * inherently sparse. An Adjacency Matrix would waste O(V^2) space on non-existent roads.
- * The list format ensures we only store data for actual connections, making it more
- * space-efficient and faster to iterate over neighboring intersections.
- */
-class CityGraph {
-public:
-    CityGraph();
-    ~CityGraph();
-
-    void addIntersection(int intersectionId);
-    void addRoad(int fromNode, int toNode, int weight, const std::string& streetName);
-    
-    // Populates the graph with a small city district (10-15 nodes)
-    void seedMap();
-
-    // Dijkstra's Algorithm: returns sequence of node IDs
-    // The optional parameter returns the number of nodes visited for analytics.
-    std::vector<int> findShortestPath(int startId, int endId, int& nodesVisited) const;
-
-    /**
-     * Recursive DFS District Summary (Day 5 Goal)
-     * Traverses the graph to count all unique infrastructure in the reachable district.
-     */
-    DistrictSummary getDistrictSummary(int startNodeId) const;
-
-    // Returns the entire graph structure in a format suitable for JSON serialization
-    const std::map<int, std::vector<Edge>>& getAdjacencyList() const { return adjacencyList; }
-
-private:
-    void performDFSSummary(int u, std::set<int>& visitedNodes, std::set<std::string>& uniqueStreets, int& edgeCount) const;
-    std::map<int, std::vector<Edge>> adjacencyList;
 };
 
 #endif // CITY_GRAPH_H
