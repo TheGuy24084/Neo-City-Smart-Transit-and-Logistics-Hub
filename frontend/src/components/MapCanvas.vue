@@ -1,8 +1,9 @@
 <template>
-  <div ref="container" class="w-full h-full relative cursor-crosshair overflow-hidden">
+  <div ref="container" class="w-full h-full relative overflow-hidden bg-slate-950/50 rounded-3xl group">
     <svg 
       viewBox="0 0 1600 1000"
       class="w-full h-full"
+      @mousemove="handleMouseMove"
     >
       <!-- Background Grid -->
       <defs>
@@ -28,45 +29,63 @@
           :y1="getNodeCoords(Number(fromNodeId))?.y || 0"
           :x2="getNodeCoords(edge.toNode)?.x || 0"
           :y2="getNodeCoords(edge.toNode)?.y || 0"
-          class="stroke-slate-800 hover:stroke-cyan-500/30 transition-all duration-300 pointer-events-none"
+          class="stroke-slate-800 transition-all duration-300 pointer-events-none"
           stroke-width="5"
           stroke-linecap="round"
         />
       </g>
 
-      <!-- Highlighted Path (Neon Green) -->
+      <!-- Highlighted Path (Neon Emerald) -->
       <g v-if="pathLines.length > 0">
         <line
           v-for="(line, idx) in pathLines"
           :key="`path-${idx}`"
           v-bind="line"
-          class="stroke-emerald-400 path-animated filter drop-shadow-[0_0_8px_rgba(52,211,153,0.8)] pointer-events-none"
-          stroke-width="4"
+          class="stroke-emerald-400 path-animated pointer-events-none"
+          stroke-width="6"
           stroke-linecap="round"
           filter="url(#neon-glow)"
         />
       </g>
 
+      <!-- Pulse Rings for Selection (Visual Feedback) -->
+      <g v-if="startNodeId !== null">
+        <circle 
+          :cx="getNodeCoords(startNodeId)?.x" 
+          :cy="getNodeCoords(startNodeId)?.y" 
+          r="25" 
+          class="fill-emerald-400/20 animate-ping pointer-events-none" 
+        />
+      </g>
+      <g v-if="endNodeId !== null">
+        <circle 
+          :cx="getNodeCoords(endNodeId)?.x" 
+          :cy="getNodeCoords(endNodeId)?.y" 
+          r="25" 
+          class="fill-red-500/20 animate-ping pointer-events-none" 
+        />
+      </g>
+
       <!-- Intersections (Nodes) -->
       <g v-for="node in nodes" :key="node.intersectionId">
-        <circle 
-          v-if="startNodeId === node.intersectionId || endNodeId === node.intersectionId"
-          :cx="node.x"
-          :cy="node.y"
-          r="20"
-          class="opacity-50"
-          :class="startNodeId === node.intersectionId ? 'fill-emerald-400 animate-pulse' : 'fill-red-500 animate-pulse'"
-        />
-        
+        <!-- Enlarged hit area for better usability -->
         <circle
           :cx="node.x"
           :cy="node.y"
-          :r="hoverNode === node.intersectionId ? 18 : 14"
-          class="transition-all duration-300 cursor-pointer pointer-events-auto"
-          :class="getNodeClass(node.intersectionId)"
-          @mouseenter="hoverNode = node.intersectionId"
-          @mouseleave="hoverNode = null"
+          r="25"
+          class="fill-transparent cursor-pointer pointer-events-auto"
+          @mouseenter="handleHover(node)"
+          @mouseleave="handleHoverExit"
           @click.stop="handleClick(node.intersectionId)"
+        />
+        
+        <!-- Visible Node Circle -->
+        <circle
+          :cx="node.x"
+          :cy="node.y"
+          :r="hoverNode === node.intersectionId ? 18 : 12"
+          class="transition-all duration-300 pointer-events-none"
+          :class="getNodeClass(node.intersectionId)"
         />
       </g>
 
@@ -75,79 +94,99 @@
           <circle
               :cx="pos.x"
               :cy="pos.y"
-              r="8"
-              class="fill-white stroke-cyan-400 stroke-2 transition-all duration-700 ease-in-out pointer-events-none"
-              filter="url(#neon-glow)"
+              r="6"
+              class="fill-white stroke-cyan-400 stroke-2 transition-all duration-700 ease-in-out pointer-events-none shadow-glow"
           />
       </g>
     </svg>
 
-    <!-- Internal Map Overlays -->
-    <div class="absolute bottom-6 left-6 p-4 bg-slate-900/90 border-l-2 border-cyan-500 backdrop-blur-sm z-10 hidden lg:block">
-        <h3 class="text-xs font-bold text-slate-400 uppercase mb-2 tracking-widest">Topology Monitor</h3>
-        <div class="flex flex-col gap-1">
-            <div class="flex justify-between items-center gap-8">
-                <span class="text-[10px] text-slate-500 font-mono uppercase">Intersections</span>
-                <span class="text-[10px] text-cyan-400 font-mono tracking-tighter">{{ nodes.length }}</span>
-            </div>
-            <div class="flex justify-between items-center gap-8">
-                <span class="text-[10px] text-slate-500 font-mono uppercase">Structural Edges</span>
-                <span class="text-[10px] text-cyan-400 font-mono tracking-tighter">{{ totalEdges }}</span>
-            </div>
+    <!-- Floating Legend (Usability) -->
+    <div class="absolute top-6 left-6 p-4 bg-slate-900/80 backdrop-blur-md border border-white/5 rounded-2xl shadow-2xl flex flex-col gap-3 z-30">
+        <div class="flex items-center gap-3">
+            <div class="w-3 h-3 rounded-full bg-emerald-400 animate-pulse"></div>
+            <span class="text-[9px] font-black uppercase tracking-widest text-slate-400">Departure</span>
         </div>
+        <div class="flex items-center gap-3">
+            <div class="w-3 h-3 rounded-full bg-red-500 animate-pulse"></div>
+            <span class="text-[9px] font-black uppercase tracking-widest text-slate-400">Destination</span>
+        </div>
+        <div class="flex items-center gap-3">
+            <div class="w-6 h-1 bg-emerald-400 rounded-full"></div>
+            <span class="text-[9px] font-black uppercase tracking-widest text-slate-400">Optimized Path</span>
+        </div>
+    </div>
+
+    <!-- Node Hover Tooltip (UX Focus) -->
+    <div 
+        v-if="hoverInfo"
+        class="fixed z-[100] pointer-events-none bg-slate-900/95 border border-cyan-500/30 p-4 rounded-xl shadow-[0_0_40px_rgba(34,211,238,0.2)] flex flex-col gap-1 min-w-[120px]"
+        :style="{ left: `${mouseX + 15}px`, top: `${mouseY + 15}px` }"
+    >
+        <span class="text-[8px] font-black text-cyan-500 uppercase tracking-widest leading-none">Intersection_ID</span>
+        <span class="text-white font-mono text-sm font-bold">#{{ hoverInfo.intersectionId }}</span>
+        <div class="mt-2 h-[2px] bg-slate-800 rounded-full overflow-hidden">
+            <div class="h-full bg-cyan-400 w-1/2"></div>
+        </div>
+        <span class="text-[7px] text-slate-500 uppercase mt-1">Traffic_Level: OPTIMAL</span>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, inject } from 'vue';
+import { ref, inject, computed } from 'vue';
 import type { useCityEngine } from '../composables/useCityEngine';
+import type { Node } from '../types/map';
 
 const engine = inject<ReturnType<typeof useCityEngine>>('cityEngine');
 if (!engine) throw new Error('CityEngine not provided');
 
 const {
     cityMap, nodes, hoverNode, startNodeId, endNodeId, 
-    shortestPath, liveCars, pathLines, totalEdges,
-    getNodeCoords
+    shortestPath, liveCars, pathLines, 
+    getNodeCoords, handleNodeClick
 } = engine;
 
-const width = ref(window.innerWidth);
-const height = ref(window.innerHeight);
+const hoverInfo = ref<Node | null>(null);
+const mouseX = ref(0);
+const mouseY = ref(0);
+
+const handleMouseMove = (e: MouseEvent) => {
+    mouseX.value = e.clientX;
+    mouseY.value = e.clientY;
+};
+
+const handleHover = (node: Node) => {
+    hoverNode.value = node.intersectionId;
+    hoverInfo.value = node;
+};
+
+const handleHoverExit = () => {
+    hoverNode.value = null;
+    hoverInfo.value = null;
+};
 
 const getNodeClass = (id: number) => {
-    if (startNodeId.value === id) return 'fill-emerald-400 drop-shadow-[0_0_10px_rgba(52,211,153,0.8)]';
-    if (endNodeId.value === id) return 'fill-red-500 drop-shadow-[0_0_10px_rgba(239,68,68,0.8)]';
-    if (shortestPath.value.includes(id)) return 'fill-emerald-400';
-    return 'fill-cyan-400 drop-shadow-[0_0_5px_rgba(34,211,238,0.4)] hover:fill-white';
+    if (startNodeId.value === id) return 'fill-emerald-400 drop-shadow-[0_0_15px_rgba(52,211,153,0.8)] z-50';
+    if (endNodeId.value === id) return 'fill-red-500 drop-shadow-[0_0_15px_rgba(239,68,68,0.8)] z-50';
+    if (shortestPath.value.includes(id)) return 'fill-emerald-400 scale-110';
+    return 'fill-cyan-400 drop-shadow-[0_0_5px_rgba(34,211,238,0.3)] hover:fill-white';
 };
 
 const handleClick = (id: number) => {
-    console.log(`[MapCanvas] Node clicked: ${id}`);
-    engine.handleNodeClick(id);
+    console.log(`[UX_DEBUG] Engaging Node Selection: ${id}`);
+    handleNodeClick(id);
 };
-
-const handleResize = () => {
-    width.value = window.innerWidth;
-    height.value = window.innerHeight;
-};
-
-onMounted(async () => {
-    window.addEventListener('resize', handleResize);
-});
-
-onUnmounted(() => {
-    window.removeEventListener('resize', handleResize);
-});
 </script>
 
 <style scoped>
 .path-animated {
   stroke-dasharray: 10;
-  animation: dash 20s linear infinite;
+  animation: move-dash 1s linear infinite;
 }
-@keyframes dash {
-  from { stroke-dashoffset: 1000; }
-  to { stroke-dashoffset: 0; }
+@keyframes move-dash {
+  to { stroke-dashoffset: -20; }
+}
+.shadow-glow {
+    filter: drop-shadow(0 0 4px rgba(34, 211, 238, 0.6));
 }
 </style>
