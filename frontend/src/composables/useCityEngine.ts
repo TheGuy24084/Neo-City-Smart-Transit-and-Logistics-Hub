@@ -1,4 +1,4 @@
-import { ref, reactive, computed, watch } from 'vue';
+import { ref, reactive, computed } from 'vue';
 import type { CityMap, Node, NavState } from '../types/map';
 import type { StateSnapshot, QueueStatus } from '../types/traffic';
 

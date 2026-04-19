@@ -6,7 +6,7 @@ A high-performance transit simulator building with a C++ Graph Engine and a reac
 Neo-City models a sparse urban network using sophisticated Data Structures and Algorithms (DSA) to optimize transit flow and logistics.
 
 ### 🛠️ Core Technology Stack
-- **Backend (Antigravity Engine)**: C++20, STL, Mutex-based Concurrency.
+- **Backend ( Engine)**: C++20, STL, Mutex-based Concurrency.
 - **Frontend (Visualizer)**: Vue 3, TypeScript, Tailwind CSS.
 - **Routing**: Optimized Dijkstra SSSP with Priority Queue.
 - **State Management**: LIFO Navigation Stack for UI.
