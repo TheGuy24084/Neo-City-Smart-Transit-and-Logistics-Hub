@@ -96,13 +96,23 @@ void handleGetMetrics(const CityGraph &graph, TrafficManager &tm,
                       const HistoryEngine &history, const AnalyticsEngine &ae, 
                       const std::string& token) {
     std::cout << "---  API: GET /api/metrics ---" << std::endl;
-    if (!AuthManager::getInstance().isTokenValid(token)) {
+    AuthManager& auth = AuthManager::getInstance();
+    
+    if (!auth.isTokenValid(token)) {
         std::cout << "HTTP/1.1 403 Forbidden" << std::endl;
+        return;
+    }
+
+    // Role-based verification
+    if (auth.getCurrentRole() == "GUEST") {
+        std::cout << "HTTP/1.1 401 Unauthorized [GUEST_RESTRICTION]" << std::endl;
+        std::cout << "{ \"error\": \"INSUFFICIENT_PRIVILEGES\", \"required\": \"ADMIN\" }" << std::endl;
         return;
     }
 
     std::cout << "HTTP/1.1 200 OK" << std::endl;
     std::cout << std::endl;
+    // ... logic ...
 
     std::cout << "{" << std::endl;
     std::cout << "  \"dijkstraNodesVisited\": "
