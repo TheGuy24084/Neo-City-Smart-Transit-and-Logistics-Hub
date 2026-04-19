@@ -6,7 +6,6 @@
 #include <mutex>
 #include <string>
 
-
 /**
  * @class AuthManager
  * @brief Singleton for managing system authentication and session state.
@@ -64,7 +63,7 @@ public:
   /**
    * @brief Initializes a restricted Guest session.
    *
-   * HUMAN TOUCH: Guest vs Admin Security
+   *  Guest vs Admin Security
    * Guest sessions are restricted to non-destructive observational data only.
    * Unlike Admin sessions which can access metrics and control transit flow,
    * Guest tokens are marked with 'GUEST' role to prevent any system mutation
