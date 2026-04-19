@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia';
-import { ref, computed } from 'vue';
+import { ref, computed, reactive } from 'vue';
 
 export const useAuthStore = defineStore('auth', () => {
     const token = ref(localStorage.getItem('neo_token') || null);
@@ -7,8 +7,18 @@ export const useAuthStore = defineStore('auth', () => {
     const operatorId = ref(localStorage.getItem('neo_operator') || 'OP_734');
     const operatorName = ref(localStorage.getItem('neo_name') || '');
 
+    // Session Database (Mocking Persistence)
+    const userDatabase = reactive<Record<string, string>>({
+        'admin': 'neocity2026',
+        'operator1': 'secure123'
+    });
+
     const isAuthenticated = computed(() => !!token.value);
-    const isAdmin = computed(() => userRole.value === 'Admin' || userRole.value === 'Operator'); // Operators are also authenticated users
+    const isAdmin = computed(() => userRole.value === 'Admin' || userRole.value === 'Operator');
+
+    function verify(username: string, pass: string): boolean {
+        return userDatabase[username] === pass;
+    }
 
     function login(newToken: string, role: string, name: string) {
         token.value = newToken;
@@ -19,8 +29,8 @@ export const useAuthStore = defineStore('auth', () => {
         localStorage.setItem('neo_name', name);
     }
 
-    function register(username: string) {
-        // MOCK: In real system, this calls backend registerUser
+    function register(username: string, pass: string) {
+        userDatabase[username] = pass;
         console.log(`[AuthStore] Registered User: ${username}`);
     }
 
@@ -52,6 +62,7 @@ export const useAuthStore = defineStore('auth', () => {
         isAdmin,
         login,
         register,
+        verify,
         guestLogin,
         logout
     };

@@ -22,7 +22,7 @@ export function useCityEngine() {
 
     // Navigation Stack (LIFO)
     const navigationStack = ref<NavState[]>([
-        { type: 'city', label: 'Neo-Sector 07' }
+        { type: 'city', label: 'Neo-City Hub' }
     ]);
 
     // Analytics Metrics
@@ -30,7 +30,9 @@ export function useCityEngine() {
         nodesVisited: 0,
         historyBytes: 0,
         avgWaitTime: 4.2,
-        systemStatus: 'OPTIMAL'
+        systemStatus: 'OPTIMAL',
+        congestionIndex: 12.4,
+        fluxDelta: -1.2
     });
 
     const showSpecs = ref(false);
@@ -78,6 +80,23 @@ export function useCityEngine() {
         }
         return lines;
     });
+
+    // Predictive Flow Analysis (Zone 04)
+    const hotZones = computed(() => {
+        // Mocking congestion based on node IDs for demo purposes
+        // In a real app, this would use activeQueue maps from backend
+        return nodes.value
+            .map(n => ({ 
+                ...n, 
+                intensity: Math.floor(Math.random() * 80) + 20 
+            }))
+            .sort((a, b) => b.intensity - a.intensity)
+            .slice(0, 3);
+    });
+
+    const quickRewind = () => {
+        currentSnapshotIndex.value = Math.max(0, currentSnapshotIndex.value - 5);
+    };
 
     const getNodeCoords = (id: number) => {
         return nodes.value.find(n => n.intersectionId === id);
@@ -246,7 +265,6 @@ export function useCityEngine() {
         const path: number[] = [];
         let curr: number | null | undefined = end;
         
-        // RECONSTRUCTION FIX: Ensure start is reached and path is valid
         if (dists[end] === Infinity) return [];
 
         while (curr !== null && curr !== undefined) {
@@ -313,7 +331,7 @@ export function useCityEngine() {
             const angle = (idx / nodeIds.length) * 2 * Math.PI;
             const radius = 400;
             const x = 800 + Math.cos(angle) * radius;
-            const y = 430 + Math.sin(angle) * (radius * 0.82);
+            const y = 380 + Math.sin(angle) * (radius * 0.82);
             newNodes.push({ intersectionId: id, x, y, name: `Node ${id}` });
         });
         return newNodes;
@@ -353,6 +371,7 @@ export function useCityEngine() {
         activeQueue, historySnapshots, currentSnapshotIndex,
         isTimeTraveling, liveCars, currentSnapshotTimestamp,
         totalEdges, totalDistance, pathLines,
+        hotZones, quickRewind,
         getNodeCoords, clearRoute, popTo, pushView, popView,
         runStressTest, fetchTrafficStatus, fetchDistrictSummary,
         findShortestPath, initHistory, generateLayout, handleNodeClick, initMap

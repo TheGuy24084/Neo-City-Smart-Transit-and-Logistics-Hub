@@ -138,6 +138,19 @@ public:
         return 4.2; // Mock avg wait time in seconds for the demo
     }
 
+    double getCongestionIndex(TrafficManager& tm, const CityGraph& cg) {
+        size_t totalQueueSize = 0;
+        const auto& adj = cg.getAdjacencyList();
+        for (const auto& [id, _] : adj) {
+            totalQueueSize += tm.getQueueLength(id);
+        }
+        size_t totalEdges = 0;
+        for (const auto& [_, edges] : adj) totalEdges += edges.size();
+        
+        if (totalEdges == 0) return 0.0;
+        return (static_cast<double>(totalQueueSize) / totalEdges) * 100.0;
+    }
+
     int getLastDijkstraNodesVisited() const { return lastDijkstraNodesVisited; }
 
 private:

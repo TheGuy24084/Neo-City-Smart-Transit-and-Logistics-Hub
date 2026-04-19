@@ -3,6 +3,7 @@ import { onMounted, provide, ref, watch } from 'vue';
 import MapCanvas from '../components/MapCanvas.vue';
 import CyberCard from '../components/CyberCard.vue';
 import CommandCenter from '../components/CommandCenter.vue';
+import TemporalFlux from '../components/TemporalFlux.vue';
 import { useCityEngine } from '../composables/useCityEngine';
 import { useAuthStore } from '../stores/auth';
 import { useRouter } from 'vue-router';
@@ -142,8 +143,8 @@ onMounted(() => {
             <div class="w-12 h-12 bg-slate-950 rounded-xl flex items-center justify-center text-red-500 font-black text-xl italic select-none">✕</div>
             <div class="flex flex-col">
                 <p class="text-[8px] font-black uppercase tracking-[0.3em] text-slate-950 mb-1">Access_Restricted</p>
-                <p class="text-slate-950 font-bold text-lg leading-tight">Administrative Privileges Req.</p>
-                <p class="text-[9px] font-mono text-slate-950/60 uppercase mt-1 italic">Guest mode restricted to observer status.</p>
+                <p class="text-slate-950 font-bold text-lg leading-tight">Operator Login Required</p>
+                <p class="text-[9px] font-mono text-slate-950/60 uppercase mt-1 italic">Guest mode restricted to basic observer status.</p>
             </div>
         </div>
     </transition>
@@ -152,11 +153,15 @@ onMounted(() => {
     <header class="w-full flex flex-col lg:flex-row justify-between items-center gap-6 z-40 bg-slate-900/40 backdrop-blur-xl border border-white/5 p-8 rounded-2xl shadow-2xl">
       <div class="flex flex-col">
         <h1 class="text-4xl font-black tracking-tighter text-white uppercase italic leading-none">
-          Neo-Sector <span class="text-cyan-400">07</span>
+          Neo-City <span class="text-cyan-400">Hub</span>
         </h1>
         <div class="flex items-center gap-4 mt-3">
             <span class="text-[8px] font-mono text-cyan-500/60 uppercase tracking-widest bg-cyan-500/5 px-2 py-1 rounded border border-cyan-500/10">
                 {{ authStore.userRole === 'GUEST' ? 'GUEST_MODE' : `ID: ${authStore.operatorId}` }}
+            </span>
+            <span class="text-slate-800 text-[10px]">|</span>
+            <span class="text-[8px] font-mono text-cyan-400 capitalize bg-cyan-400/10 px-2 py-1 rounded border border-cyan-400/20">
+                {{ authStore.operatorName }}
             </span>
             <span class="text-slate-800 text-[10px]">|</span>
             <nav class="flex items-center gap-2">
@@ -183,15 +188,18 @@ onMounted(() => {
         </button>
         <button 
             @click="handleLogout"
-            class="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-[10px] text-red-500 uppercase font-black tracking-widest transition-all rounded-lg"
+            class="px-4 py-2 text-[10px] uppercase font-black tracking-widest transition-all rounded-lg border"
+            :class="authStore.userRole === 'GUEST' 
+                ? 'bg-emerald-500/10 hover:bg-emerald-500/20 border-emerald-500/30 text-emerald-400' 
+                : 'bg-red-500/10 hover:bg-red-500/20 border-red-500/30 text-red-500'"
         >
-            Logout
+            {{ authStore.userRole === 'GUEST' ? 'Login' : 'Logout' }}
         </button>
       </div>
     </header>
 
     <!-- Main Grid -->
-    <main class="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-8 items-start relative">
+    <main class="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-8 items-start relative overflow-hidden">
       <aside class="lg:col-span-3 flex flex-col gap-6">
         <CommandCenter />
         
@@ -215,46 +223,49 @@ onMounted(() => {
         </div>
       </aside>
 
-      <section class="lg:col-span-6 flex flex-col gap-6 h-full min-h-[500px] lg:min-h-[750px]">
+      <!-- Center Col: Graph -->
+      <section class="lg:col-span-6 flex flex-col gap-6 h-full min-h-[500px] lg:min-h-[750px] relative">
         <MapCanvas />
       </section>
 
-      <aside class="lg:col-span-3 flex flex-col gap-6">
-        <div class="relative group cursor-pointer" @click="handleGuestAction">
-            <CyberCard variant="purple">
-                <template #title>01. Metrics Engine</template>
-                <div class="space-y-6">
+      <aside class="lg:col-span-3 flex flex-col gap-6 h-full">
+        <!-- New Metrics Row -->
+        <div class="flex gap-4 items-start">
+            <transition name="side-slide">
+                <CyberCard v-if="shortestPath.length > 0" variant="cyan" class="flex-1 shadow-[0_0_40px_rgba(34,211,238,0.1)] border-cyan-500/20 !p-4">
+                    <template #title>Route</template>
+                    <div class="space-y-2">
+                        <span class="text-[8px] text-cyan-500/40 uppercase font-black tracking-widest">Metric</span>
+                        <div class="flex items-baseline gap-1">
+                            <span class="text-lg font-mono text-white tracking-tighter italic">{{ totalDistance }}</span>
+                            <span class="text-[8px] text-cyan-500 font-normal uppercase">Units</span>
+                        </div>
+                    </div>
+                </CyberCard>
+            </transition>
+
+            <div class="flex-1 relative group cursor-pointer" @click="handleGuestAction">
+                <CyberCard variant="purple" class="!p-4">
+                    <template #title>01. Metrics</template>
                     <div class="space-y-3">
                         <div class="flex justify-between items-end">
-                            <span class="text-[9px] text-purple-400/50 uppercase font-bold tracking-widest">Graph Traversal</span>
+                            <span class="text-[8px] text-purple-400/50 uppercase font-black tracking-widest">Traversal</span>
                         </div>
-                        <div class="flex items-center gap-4">
-                            <div class="flex-1 h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                        <div class="flex items-center gap-3">
+                            <div class="flex-1 h-1 bg-slate-800 rounded-full overflow-hidden">
                                 <div 
                                     class="h-full bg-gradient-to-r from-purple-600 to-purple-400 transition-all duration-1000"
                                     :style="{ width: authStore.userRole === 'GUEST' ? '0%' : '65%' }"
                                 ></div>
                             </div>
-                            <span class="text-xs font-mono text-white leading-none">{{ authStore.userRole === 'GUEST' ? '???' : metrics.nodesVisited }}</span>
+                            <span class="text-[10px] font-mono text-white leading-none">{{ authStore.userRole === 'GUEST' ? '???' : metrics.nodesVisited }}</span>
                         </div>
                     </div>
-                </div>
-            </CyberCard>
+                </CyberCard>
+            </div>
         </div>
 
-        <transition name="side-slide">
-            <CyberCard v-if="shortestPath.length > 0" variant="cyan">
-                <template #title>Route Overview</template>
-                <div class="space-y-4">
-                    <div class="flex flex-col">
-                        <span class="text-[9px] text-cyan-500/40 uppercase font-bold tracking-widest">Total Path Metric</span>
-                        <span class="text-4xl font-mono text-white tracking-tighter italic">
-                            {{ totalDistance }}<span class="text-sm text-cyan-500 font-normal ml-2">UNITS</span>
-                        </span>
-                    </div>
-                </div>
-            </CyberCard>
-        </transition>
+        <TemporalFlux />
       </aside>
     </main>
   </div>

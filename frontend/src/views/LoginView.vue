@@ -7,29 +7,33 @@ const router = useRouter();
 const authStore = useAuthStore();
 
 const mode = ref<'login' | 'register'>('login');
-const username = ref(mode.value === 'login' ? 'admin' : '');
+const username = ref('');
 const password = ref('');
 const isError = ref(false);
 const isBooting = ref(false);
 const bootProgress = ref(0);
 
+// Initialize with default for convenience
+if (mode.value === 'login') {
+    username.value = 'admin';
+}
+
 const handleAuth = async () => {
     isError.value = false;
     
     if (mode.value === 'login') {
-        // MOCK LOGIN
-        if ((username.value === 'admin' && password.value === 'neocity2026') || 
-            (username.value === 'operator1' && password.value === 'secure123')) {
-            startBootSequence('Admin', username.value);
+        if (authStore.verify(username.value, password.value)) {
+            const role = username.value === 'admin' ? 'Admin' : 'Operator';
+            startBootSequence(role, username.value);
         } else {
             triggerError();
         }
     } else {
-        // MOCK REGISTER
+        // REGISTER FLOW
         if (username.value && password.value) {
-            authStore.register(username.value);
-            mode.value = 'login';
-            password.value = '';
+            authStore.register(username.value, password.value);
+            // Automatic Entry after Registration
+            startBootSequence('Operator', username.value);
         } else {
             triggerError();
         }
@@ -116,6 +120,7 @@ const startBootSequence = (role: string, name: string) => {
                             class="w-full bg-slate-950/80 border border-white/5 p-5 rounded-2xl text-white font-mono text-sm focus:outline-none focus:border-cyan-500/40 transition-all focus:shadow-[0_0_30px_rgba(34,211,238,0.1)]"
                             placeholder="OPERATOR_CODE"
                             autocomplete="username"
+                            required
                         >
                     </div>
 
@@ -127,6 +132,7 @@ const startBootSequence = (role: string, name: string) => {
                             class="w-full bg-slate-950/80 border border-white/5 p-5 rounded-2xl text-white font-mono text-sm focus:outline-none focus:border-cyan-500/40 transition-all focus:shadow-[0_0_30px_rgba(34,211,238,0.1)]"
                             placeholder="••••••••"
                             autocomplete="current-password"
+                            required
                         >
                     </div>
 
@@ -141,9 +147,9 @@ const startBootSequence = (role: string, name: string) => {
                         <button 
                             type="button"
                             @click="handleGuest"
-                            class="w-full py-3 text-[9px] text-slate-400 hover:text-cyan-400 uppercase font-bold tracking-[0.4em] transition-all border border-transparent hover:border-cyan-500/20 rounded-xl"
+                            class="w-full py-3 text-[9px] text-emerald-500/70 hover:text-emerald-400 uppercase font-black tracking-[0.4em] transition-all border border-emerald-500/10 hover:border-emerald-500/30 rounded-xl"
                         >
-                            — Enter as Guest —
+                            <span class="opacity-50">—</span> Enter as Guest <span class="opacity-50">—</span>
                         </button>
                     </div>
                 </form>

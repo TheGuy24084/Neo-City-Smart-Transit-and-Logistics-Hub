@@ -145,6 +145,15 @@ int main() {
     handleGetMap(*hub, validToken);
     handleGetRoute(*hub, ae, 0, 7, validToken);
     handleGetMetrics(*hub, tm, history, ae, validToken);
+    
+    // Day 5: Temporal Flux API Simulation
+    std::cout << "--- API: GET /api/analytics/flux ---" << std::endl;
+    std::cout << "HTTP/1.1 200 OK" << std::endl;
+    std::cout << "{" << std::endl;
+    std::cout << "  \"congestionIndex\": " << ae.getCongestionIndex(tm, *hub) << "," << std::endl;
+    std::cout << "  \"fluxDelta\": -2.4," << std::endl; // Mock delta
+    std::cout << "  \"systemPulse\": [12, 45, 32, 67, 88, 54, 30]" << std::endl;
+    std::cout << "}" << std::endl;
 
     // Simulate Access with Invalid Token
     handleGetMap(*hub, "MALICIOUS_TOKEN_XYZ");
