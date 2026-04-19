@@ -6,31 +6,46 @@ import CyberCard from './CyberCard.vue';
 const engine = inject<ReturnType<typeof useCityEngine>>('cityEngine');
 if (!engine) throw new Error('CityEngine not provided');
 
-const { nodes, startNodeId, endNodeId, findShortestPath, clearRoute } = engine;
+const { 
+    nodes, startNodeId, endNodeId, 
+    startSearch, endSearch,
+    findShortestPath, clearRoute 
+} = engine;
 
-const startSearch = ref('');
-const endSearch = ref('');
 const showStartList = ref(false);
 const showEndList = ref(false);
 
 const filteredStartNodes = computed(() => {
-    return nodes.value.filter(n => n.intersectionId.toString().includes(startSearch.value) || n.name.toLowerCase().includes(startSearch.value.toLowerCase()));
+    const s = startSearch.value.toLowerCase();
+    if (!s) return nodes.value;
+    return nodes.value.filter(n => 
+        n.intersectionId.toString().includes(s) || 
+        n.name?.toLowerCase().includes(s) ||
+        `intersection #${n.intersectionId}`.includes(s)
+    );
 });
 
 const filteredEndNodes = computed(() => {
-    return nodes.value.filter(n => n.intersectionId.toString().includes(endSearch.value) || n.name.toLowerCase().includes(endSearch.value.toLowerCase()));
+    const s = endSearch.value.toLowerCase();
+    if (!s) return nodes.value;
+    return nodes.value.filter(n => 
+        n.intersectionId.toString().includes(s) || 
+        n.name?.toLowerCase().includes(s) ||
+        `intersection #${n.intersectionId}`.includes(s)
+    );
 });
 
 const selectStart = (id: number) => {
     startNodeId.value = id;
     startSearch.value = `Intersection #${id}`;
-    showStartList.value = false;
+    setTimeout(() => { showStartList.value = false; }, 100);
 };
 
 const selectEnd = (id: number) => {
     endNodeId.value = id;
     endSearch.value = `Intersection #${id}`;
-    showEndList.value = false;
+    setTimeout(() => { showEndList.value = false; }, 100);
+    handleOptimize();
 };
 
 const handleOptimize = () => {
@@ -112,7 +127,7 @@ const handleOptimize = () => {
                 </button>
                 <button 
                     @click="handleOptimize"
-                    :disabled="!startNodeId || !endNodeId"
+                    :disabled="startNodeId === null || endNodeId === null"
                     class="py-3 bg-cyan-500 hover:bg-cyan-400 text-slate-950 rounded-xl text-[10px] uppercase font-black tracking-widest transition-all shadow-lg disabled:opacity-30 disabled:cursor-not-allowed"
                 >
                     Find Route
@@ -131,4 +146,6 @@ const handleOptimize = () => {
   opacity: 0;
   transform: translateY(-5px);
 }
+.custom-scrollbar::-webkit-scrollbar { width: 4px; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.05); border-radius: 10px; }
 </style>

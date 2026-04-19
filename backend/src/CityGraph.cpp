@@ -61,6 +61,13 @@ void CityGraph::seedMap() {
 
 std::vector<int> CityGraph::findShortestPath(int startId, int endId,
                                              int &nodesVisited) const {
+  nodesVisited = 0;
+  
+  // PERFORMANCE SAFETY: Immediate return if start and end are identical
+  if (startId == endId) {
+    return {startId};
+  }
+
   // Why Priority Queue?
   // We use std::priority_queue (Min-Heap) to always extract the node with the
   // minimum current distance. This reduces the search complexity from O(V) to

@@ -1,5 +1,5 @@
 <template>
-  <div ref="container" class="w-full h-full relative overflow-hidden bg-slate-950/50 rounded-3xl group">
+  <div ref="container" class="w-full h-full relative overflow-hidden bg-slate-950/50 rounded-3xl group" :class="{ 'cursor-wait': isSearching }">
     <svg 
       viewBox="0 0 1600 1000"
       class="w-full h-full"
@@ -21,25 +21,27 @@
       <rect width="100%" height="100%" fill="url(#grid)" class="pointer-events-none" />
 
       <!-- Road Connections (Edges) -->
-      <g v-for="(edges, fromNodeId) in cityMap" :key="`edges-${fromNodeId}`">
-        <line
-          v-for="edge in edges"
-          :key="`${fromNodeId}-${edge.toNode}`"
-          :x1="getNodeCoords(Number(fromNodeId))?.x || 0"
-          :y1="getNodeCoords(Number(fromNodeId))?.y || 0"
-          :x2="getNodeCoords(edge.toNode)?.x || 0"
-          :y2="getNodeCoords(edge.toNode)?.y || 0"
-          class="stroke-slate-800 transition-all duration-300 pointer-events-none"
-          stroke-width="5"
-          stroke-linecap="round"
-        />
+      <g v-memo="[nodes.length, !!cityMap]">
+        <g v-for="(edges, fromNodeId) in cityMap" :key="`cluster-${fromNodeId}`">
+          <line
+            v-for="edge in edges"
+            :key="`${fromNodeId}-${edge.toNode}`"
+            :x1="getNodeCoords(Number(fromNodeId))?.x || 0"
+            :y1="getNodeCoords(Number(fromNodeId))?.y || 0"
+            :x2="getNodeCoords(edge.toNode)?.x || 0"
+            :y2="getNodeCoords(edge.toNode)?.y || 0"
+            class="stroke-slate-800 transition-all duration-300 pointer-events-none"
+            stroke-width="5"
+            stroke-linecap="round"
+          />
+        </g>
       </g>
 
       <!-- Highlighted Path (Neon Emerald) -->
-      <g v-if="pathLines.length > 0">
+      <g v-if="pathLines.length > 0" v-memo="[pathLines.length, shortestPath.join(',')]">
         <line
           v-for="(line, idx) in pathLines"
-          :key="`path-${idx}`"
+          :key="`path-seg-${idx}-${line.x1}`"
           v-bind="line"
           class="stroke-emerald-400 path-animated pointer-events-none"
           stroke-width="6"
@@ -49,7 +51,7 @@
       </g>
 
       <!-- Pulse Rings for Selection (Visual Feedback) -->
-      <g v-if="startNodeId !== null">
+      <g v-if="startNodeId !== null" :key="`start-pulse-${startNodeId}`">
         <circle 
           :cx="getNodeCoords(startNodeId)?.x" 
           :cy="getNodeCoords(startNodeId)?.y" 
@@ -57,7 +59,7 @@
           class="fill-emerald-400/20 animate-ping pointer-events-none" 
         />
       </g>
-      <g v-if="endNodeId !== null">
+      <g v-if="endNodeId !== null" :key="`end-pulse-${endNodeId}`">
         <circle 
           :cx="getNodeCoords(endNodeId)?.x" 
           :cy="getNodeCoords(endNodeId)?.y" 
@@ -67,30 +69,33 @@
       </g>
 
       <!-- Intersections (Nodes) -->
-      <g v-for="node in nodes" :key="node.intersectionId">
-        <!-- Enlarged hit area for better usability -->
-        <circle
-          :cx="node.x"
-          :cy="node.y"
-          r="25"
-          class="fill-transparent cursor-pointer pointer-events-auto"
-          @mouseenter="handleHover(node)"
-          @mouseleave="handleHoverExit"
-          @click.stop="handleClick(node.intersectionId)"
-        />
-        
-        <!-- Visible Node Circle -->
-        <circle
-          :cx="node.x"
-          :cy="node.y"
-          :r="hoverNode === node.intersectionId ? 18 : 12"
-          class="transition-all duration-300 pointer-events-none"
-          :class="getNodeClass(node.intersectionId)"
-        />
+      <g v-memo="[nodes.length, hoverNode, startNodeId, endNodeId, shortestPath.length]">
+        <g v-for="node in nodes" :key="`node-group-${node.intersectionId}`">
+            <!-- Enlarged hit area for better usability -->
+            <circle
+                :cx="node.x"
+                :cy="node.y"
+                r="25"
+                class="fill-transparent cursor-pointer pointer-events-auto"
+                :class="{ 'pointer-events-none': isSearching }"
+                @mouseenter="handleHover(node)"
+                @mouseleave="handleHoverExit"
+                @click.stop="handleClick(node.intersectionId)"
+            />
+            
+            <!-- Visible Node Circle -->
+            <circle
+                :cx="node.x"
+                :cy="node.y"
+                :r="hoverNode === node.intersectionId ? 18 : 12"
+                class="transition-all duration-300 pointer-events-none"
+                :class="getNodeClass(node.intersectionId)"
+            />
+        </g>
       </g>
 
       <!-- Dynamic Car Rendering -->
-      <g v-for="(pos, carId) in liveCars" :key="`car-${carId}`">
+      <g v-for="(pos, carId) in liveCars" :key="`car-render-${carId}`">
           <circle
               :cx="pos.x"
               :cy="pos.y"
@@ -99,6 +104,16 @@
           />
       </g>
     </svg>
+
+    <!-- Loading Sentinel (Performance) -->
+    <transition name="fade">
+        <div v-if="isSearching" class="absolute inset-0 bg-slate-950/20 backdrop-blur-[2px] z-50 flex items-center justify-center pointer-events-none">
+            <div class="px-6 py-3 bg-slate-900 border border-cyan-500/40 rounded-full shadow-2xl flex items-center gap-4">
+                <div class="w-4 h-4 border-2 border-cyan-500 border-t-transparent animate-spin rounded-full"></div>
+                <span class="text-[9px] font-black text-white uppercase tracking-[0.3em]">Processing_Neural_Path</span>
+            </div>
+        </div>
+    </transition>
 
     <!-- Floating Legend (Usability) -->
     <div class="absolute top-6 left-6 p-4 bg-slate-900/80 backdrop-blur-md border border-white/5 rounded-2xl shadow-2xl flex flex-col gap-3 z-30">
@@ -133,7 +148,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, inject, computed } from 'vue';
+import { ref, inject } from 'vue';
 import type { useCityEngine } from '../composables/useCityEngine';
 import type { Node } from '../types/map';
 
@@ -142,7 +157,7 @@ if (!engine) throw new Error('CityEngine not provided');
 
 const {
     cityMap, nodes, hoverNode, startNodeId, endNodeId, 
-    shortestPath, liveCars, pathLines, 
+    shortestPath, liveCars, pathLines, isSearching,
     getNodeCoords, handleNodeClick
 } = engine;
 
@@ -173,7 +188,6 @@ const getNodeClass = (id: number) => {
 };
 
 const handleClick = (id: number) => {
-    console.log(`[UX_DEBUG] Engaging Node Selection: ${id}`);
     handleNodeClick(id);
 };
 </script>
@@ -188,5 +202,11 @@ const handleClick = (id: number) => {
 }
 .shadow-glow {
     filter: drop-shadow(0 0 4px rgba(34, 211, 238, 0.6));
+}
+.fade-enter-active, .fade-leave-active {
+    transition: opacity 0.3s ease;
+}
+.fade-enter-from, .fade-leave-to {
+    opacity: 0;
 }
 </style>

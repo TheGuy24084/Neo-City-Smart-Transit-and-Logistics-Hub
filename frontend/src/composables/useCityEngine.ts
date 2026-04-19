@@ -11,6 +11,14 @@ export function useCityEngine() {
     const startNodeId = ref<number | null>(null);
     const endNodeId = ref<number | null>(null);
     const shortestPath = ref<number[]>([]);
+    const isSearching = ref(false);
+    
+    // UI Interaction State (Shared with Sidebar)
+    const startSearch = ref('');
+    const endSearch = ref('');
+
+    // UI Feedback
+    const errorNotification = ref<string | null>(null);
 
     // Navigation Stack (LIFO)
     const navigationStack = ref<NavState[]>([
@@ -25,12 +33,10 @@ export function useCityEngine() {
         systemStatus: 'OPTIMAL'
     });
 
-    // Day 5 Features
     const showSpecs = ref(false);
     const isStressTesting = ref(false);
     const districtSummary = ref<any>(null);
 
-    // Traffic & History State
     const activeQueue = ref<QueueStatus | null>(null);
     const historySnapshots = ref<StateSnapshot[]>([]);
     const currentSnapshotIndex = ref(0);
@@ -81,6 +87,10 @@ export function useCityEngine() {
         startNodeId.value = null;
         endNodeId.value = null;
         shortestPath.value = [];
+        isSearching.value = false;
+        errorNotification.value = null;
+        startSearch.value = '';
+        endSearch.value = '';
     };
 
     const popTo = (index: number) => {
@@ -93,7 +103,7 @@ export function useCityEngine() {
 
     const pushView = (state: NavState) => {
         const current = navigationStack.value[navigationStack.value.length - 1];
-        if (current.type === state.type && current.id === state.id) return;
+        if (current.type === state.type && (state.id !== undefined && current.id === state.id)) return;
         if (navigationStack.value.length < 5) {
             navigationStack.value.push(state);
         }
@@ -109,12 +119,6 @@ export function useCityEngine() {
             }
         }
     };
-
-    watch(currentSnapshotIndex, (newIdx) => {
-        if (historySnapshots.value[newIdx]) {
-            liveCars.value = historySnapshots.value[newIdx].carPositions;
-        }
-    });
 
     const runStressTest = () => {
         isStressTesting.value = true;
@@ -167,28 +171,56 @@ export function useCityEngine() {
         }
     };
 
+    let searchTimeout: any = null;
+
     const findShortestPath = async () => {
         if (startNodeId.value === null || endNodeId.value === null) return;
-        try {
-            // MOCK LOGIC for Day 4 Demo: Update metrics
-            const path = await simulateBackendDijkstra(startNodeId.value, endNodeId.value);
-            shortestPath.value = path;
-            metrics.nodesVisited = Math.floor(path.length * 1.5 + Math.random() * 5);
-            metrics.historyBytes = historySnapshots.value.length * 1024;
-        } catch (error) {
-            console.error("Pathfinding error:", error);
-        }
+        
+        shortestPath.value = [];
+        isSearching.value = true;
+        errorNotification.value = null;
+
+        if (searchTimeout) clearTimeout(searchTimeout);
+
+        searchTimeout = setTimeout(async () => {
+            try {
+                if (startNodeId.value === null || endNodeId.value === null) {
+                    isSearching.value = false;
+                    return;
+                }
+
+                const path = await simulateBackendDijkstra(startNodeId.value, endNodeId.value);
+                
+                if (!path || path.length === 0) {
+                    errorNotification.value = "No direct route found between these sectors.";
+                } else {
+                    shortestPath.value = path;
+                    metrics.nodesVisited = Math.floor(path.length * 1.5 + Math.random() * 5);
+                    metrics.historyBytes = historySnapshots.value.length * 1024;
+                }
+            } catch (error) {
+                console.error("Pathfinding process failed:", error);
+                errorNotification.value = "Navigation sub-system offline: check neural link.";
+            } finally {
+                isSearching.value = false;
+            }
+        }, 300);
     };
 
     const simulateBackendDijkstra = async (start: number, end: number) => {
+        if (start === end) return [start];
+
         const dists: Record<number, number> = {};
         const prev: Record<number, number | null> = {};
         const unvisited = new Set<number>();
 
         Object.keys(cityMap.value).forEach(id => {
-            dists[Number(id)] = Infinity;
-            unvisited.add(Number(id));
+            const nid = Number(id);
+            dists[nid] = Infinity;
+            unvisited.add(nid);
         });
+
+        if (dists[start] === undefined || dists[end] === undefined) return [];
 
         dists[start] = 0;
 
@@ -201,7 +233,8 @@ export function useCityEngine() {
             if (u === null || dists[u] === Infinity || u === end) break;
             unvisited.delete(u);
 
-            for (const edge of cityMap.value[u] || []) {
+            const neighbors = cityMap.value[u];
+            for (const edge of neighbors || []) {
                 const alt = dists[u] + edge.weight;
                 if (alt < dists[edge.toNode]) {
                     dists[edge.toNode] = alt;
@@ -210,13 +243,20 @@ export function useCityEngine() {
             }
         }
 
-        const path = [];
-        let curr: number | null = end;
-        while (curr !== null) {
+        const path: number[] = [];
+        let curr: number | null | undefined = end;
+        
+        // RECONSTRUCTION FIX: Ensure start is reached and path is valid
+        if (dists[end] === Infinity) return [];
+
+        while (curr !== null && curr !== undefined) {
             path.unshift(curr);
+            if (curr === start) break;
             curr = prev[curr];
+            if (path.length > nodes.value.length + 1) break; 
         }
-        return path[0] === start ? path : [];
+        
+        return (path.length > 0 && path[0] === start) ? path : [];
     };
 
     const initHistory = () => {
@@ -270,17 +310,18 @@ export function useCityEngine() {
         const nodeIds = Object.keys(map).map(Number).sort((a, b) => a - b);
         
         nodeIds.forEach((id, idx) => {
-            // Layout nodes in a organic, circular flow for Neo-City aesthetic
             const angle = (idx / nodeIds.length) * 2 * Math.PI;
-            const radius = 400; // Adjusted for 1600x1000 viewBox safety
+            const radius = 400;
             const x = 800 + Math.cos(angle) * radius;
-            const y = 500 + Math.sin(angle) * (radius * 0.82);
+            const y = 430 + Math.sin(angle) * (radius * 0.82);
             newNodes.push({ intersectionId: id, x, y, name: `Node ${id}` });
         });
         return newNodes;
     };
 
     const handleNodeClick = (id: number) => {
+        if (isSearching.value) return;
+
         console.log(`[CityEngine] Processing click for Node #${id}`);
         fetchTrafficStatus(id);
         pushView({ 
@@ -291,19 +332,23 @@ export function useCityEngine() {
 
         if (startNodeId.value === null) {
             startNodeId.value = id;
+            startSearch.value = `Intersection #${id}`;
         } else if (endNodeId.value === null && startNodeId.value !== id) {
             endNodeId.value = id;
+            endSearch.value = `Intersection #${id}`;
             findShortestPath();
         } else if (startNodeId.value !== null && endNodeId.value !== null) {
             clearRoute();
             startNodeId.value = id;
+            startSearch.value = `Intersection #${id}`;
         }
     };
 
     return {
         cityMap, nodes, hoverNode,
-        startNodeId, endNodeId, shortestPath,
-        navigationStack, metrics,
+        startNodeId, endNodeId, shortestPath, isSearching,
+        startSearch, endSearch,
+        errorNotification, navigationStack, metrics,
         showSpecs, isStressTesting, districtSummary,
         activeQueue, historySnapshots, currentSnapshotIndex,
         isTimeTraveling, liveCars, currentSnapshotTimestamp,
